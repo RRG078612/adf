@@ -1,0 +1,121 @@
+{
+	"name": "dataflow1",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "ds_healthcare_ip",
+						"type": "DatasetReference"
+					},
+					"name": "Input"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "ds_healthcare_op",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [
+				{
+					"name": "Select"
+				},
+				{
+					"name": "updatesal"
+				},
+				{
+					"name": "aggregatebycity",
+					"description": "agg by city"
+				},
+				{
+					"name": "filtecity"
+				},
+				{
+					"name": "sortbycity"
+				},
+				{
+					"name": "rank1"
+				},
+				{
+					"name": "window1"
+				},
+				{
+					"name": "pivot"
+				},
+				{
+					"name": "unpivot1"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          emp_id as integer,",
+				"          name as string,",
+				"          age as short,",
+				"          gender as string,",
+				"          dept as string,",
+				"          salary as double,",
+				"          bonus as double,",
+				"          city as string,",
+				"          email as string,",
+				"          joining_date as date,",
+				"          last_login as timestamp,",
+				"          is_active as boolean,",
+				"          manager_id as integer",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false,",
+				"     partitionBy('roundRobin', 2)) ~> Input",
+				"Input select(mapColumn(",
+				"          emp_id,",
+				"          emp_name = name,",
+				"          age,",
+				"          gender,",
+				"          dept,",
+				"          salary,",
+				"          bonus,",
+				"          city,",
+				"          email,",
+				"          joining_date,",
+				"          last_login,",
+				"          is_active,",
+				"          manager_id",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> Select",
+				"Select derive(updated_sal = multiply(salary , 1.2)) ~> updatesal",
+				"updatesal aggregate(groupBy(city),",
+				"     count_emp = count(emp_id)) ~> aggregatebycity",
+				"aggregatebycity filter(greater(count_emp, 2)) ~> filtecity",
+				"filtecity sort(desc(count_emp, false)) ~> sortbycity",
+				"sortbycity rank(desc(count_emp, true),",
+				"     output(CityRank as long)) ~> rank1",
+				"updatesal window(over(city),",
+				"     asc(emp_id, true),",
+				"     rnk = denseRank()) ~> window1",
+				"rank1 pivot(pivotBy(city),",
+				"     count = sum(count_emp),",
+				"     columnNaming: '$N$V',",
+				"     lateral: false) ~> pivot",
+				"pivot unpivot(output(",
+				"          city as string,",
+				"          count as string",
+				"     ),",
+				"     lateral: false,",
+				"     ignoreNullPivots: false) ~> unpivot1",
+				"window1 sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> sink1"
+			]
+		}
+	}
+}
